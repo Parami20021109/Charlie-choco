@@ -99,7 +99,7 @@ function Home() {
                     className="w-full md:w-1/2 h-[500px] md:h-[600px] relative rounded-3xl overflow-hidden shadow-2xl order-1 md:order-2"
                 >
                      <img 
-                        src="https://images.unsplash.com/photo-1548907040-4baa42d10919?auto=format&fit=crop&w=1200&q=80" 
+                        src="/images/dark-intense.svg" 
                         alt="Pouring Chocolate" 
                         className="w-full h-full object-cover grayscale hover:grayscale-0 transition-grayscale duration-1000 ease-in-out" 
                     />
@@ -161,9 +161,9 @@ function Home() {
 
          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-6 max-w-7xl mx-auto">
             {[
-                { title: 'Dark Intense', img: 'https://images.unsplash.com/photo-1548907040-4baa42d10919?auto=format&fit=crop&w=800', price: '$12.99' },
-                { title: 'Golden Truffles', img: 'https://images.unsplash.com/photo-1526081347589-7fa3cbcd1f5c?auto=format&fit=crop&w=800', price: '$24.99' },
-                { title: 'Creamy Milk', img: 'https://images.unsplash.com/photo-1605698802053-ec076606a54f?auto=format&fit=crop&w=800', price: '$14.99' },
+                { title: 'Dark Intense', img: '/images/dark-intense.svg', price: '$12.99' },
+                { title: 'Golden Truffles', img: '/images/golden-truffles.svg', price: '$24.99' },
+                { title: 'Creamy Milk', img: '/images/creamy-milk.svg', price: '$14.99' },
             ].map((item, i) => (
                 <motion.div 
                     key={i}
