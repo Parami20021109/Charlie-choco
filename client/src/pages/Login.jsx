@@ -17,9 +17,20 @@ const Login = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Login Successful! Welcome to the Factory.');
-        navigate('/');
-      } else {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // Redirect based on role/email
+        if (data.user.role === 'admin' || data.user.email === 'admin@gmail.com') {
+            navigate('/admin');
+        } else if (data.user.role === 'chef' || data.user.email === 'chef@gmail.com') {
+            navigate('/chef');
+        } else if (data.user.role === 'supplier' || data.user.email === 'supplier@gmail.com') {
+            navigate('/suppliers');
+        } else {
+            navigate('/profile');
+        }
+    } else {
         alert(data.message);
       }
     } catch (err) {
