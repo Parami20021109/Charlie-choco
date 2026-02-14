@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,17 +8,57 @@ export default function Checkout() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState('form'); // form, processing, success
+    const [locationType, setLocationType] = useState('manual'); // 'manual' or 'gps'
+    const [gpsLoading, setGpsLoading] = useState(false);
+    const [gpsCoords, setGpsCoords] = useState(null);
     const [formData, setFormData] = useState({
         name: '', email: '', address: '', card: '', expiry: '', cvc: ''
     });
 
     // Auto-fill form if user is logged in
-    useState(() => {
+    useEffect(() => {
         const user = JSON.parse(localStorage.getItem('user'));
         if(user) {
             setFormData(prev => ({...prev, name: user.username, email: user.email}));
         }
     }, []);
+
+    const handleUseCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser.');
+            return;
+        }
+
+        setGpsLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                setGpsCoords({ lat: latitude, lng: longitude });
+                
+                // Attempt Reverse Geocode for better UX
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const data = await res.json();
+                    if (data && data.display_name) {
+                        setFormData(prev => ({ ...prev, address: data.display_name }));
+                    } else {
+                        setFormData(prev => ({ ...prev, address: `[GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}]` }));
+                    }
+                } catch (e) {
+                    setFormData(prev => ({ ...prev, address: `[GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}]` }));
+                }
+
+                setLocationType('gps');
+                setGpsLoading(false);
+            },
+            (error) => {
+                console.error("Error getting location:", error);
+                alert('Unable to retrieve your location. Please enter address manually.');
+                setGpsLoading(false);
+                setLocationType('manual');
+            }
+        );
+    };
 
     const handlePayment = async (e) => {
         e.preventDefault();
@@ -35,6 +75,10 @@ export default function Checkout() {
                     customerName: formData.name,
                     email: formData.email,
                     address: formData.address,
+                    
+                    // Send coordinates if available
+                    location: gpsCoords, 
+                    
                     items: cart.map(item => ({
                         product: item._id,
                         name: item.name,
@@ -136,9 +180,37 @@ export default function Checkout() {
                              <label className="text-xs uppercase text-white/50">Email Address</label>
                              <input required type="email" value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-gold-500 outline-none transition-colors" placeholder="charlie@goldenticket.com" />
                         </div>
+                        
                         <div className="space-y-2">
-                             <label className="text-xs uppercase text-white/50">Shipping Address</label>
-                             <input required value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-gold-500 outline-none transition-colors" placeholder="123 Chocolate Factory Rd" />
+                             <label className="text-xs uppercase text-white/50 mb-2 block">Delivery Location</label>
+                             
+                             <div className="flex gap-2 mb-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setLocationType('manual')}
+                                    className={`flex-1 py-2 text-xs font-bold uppercase rounded border ${locationType === 'manual' ? 'bg-white text-black border-white' : 'bg-transparent text-white/50 border-white/20 hover:border-white'}`}
+                                >
+                                    Enter Address manually
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleUseCurrentLocation}
+                                    className={`flex-1 py-2 text-xs font-bold uppercase rounded border ${locationType === 'gps' ? 'bg-gold-500 text-black border-gold-500' : 'bg-transparent text-white/50 border-white/20 hover:border-white'}`}
+                                >
+                                    {gpsLoading ? 'Locating...' : 'Use My Location'}
+                                </button>
+                             </div>
+
+                             <input 
+                                required 
+                                value={formData.address} 
+                                onChange={e=>setFormData({...formData, address: e.target.value})} 
+                                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-gold-500 outline-none transition-colors" 
+                                placeholder={locationType === 'gps' ? "GPS Coordinates (or add details)" : "123 Chocolate Factory Rd"}
+                             />
+                             {locationType === 'gps' && gpsCoords && (
+                                 <p className="text-[10px] text-green-400 mt-1">✓ Location Locked: {gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)}</p>
+                             )}
                         </div>
 
                         <div className="pt-4 mt-4 border-t border-white/10">

@@ -25,7 +25,11 @@ const OrderSchema = new mongoose.Schema({
       note: String
     }
   ],
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  location: {
+    lat: Number,
+    lng: Number
+  }
 });
 
 module.exports = mongoose.model('Order', OrderSchema);

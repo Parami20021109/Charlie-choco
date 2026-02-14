@@ -260,6 +260,7 @@ app.post('/api/orders', async (req, res) => {
             customerName,
             email,
             address,
+            location: req.body.location, // Capture coordinates
             items,
             totalAmount,
             status: 'Paid'
