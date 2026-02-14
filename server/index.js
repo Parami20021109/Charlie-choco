@@ -13,6 +13,7 @@ const Product = require('./models/Product');
 const Order = require('./models/Order');
 const Recipe = require('./models/Recipe');
 const Supplier = require('./models/Supplier');
+const Feedback = require('./models/Feedback');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,6 +27,7 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
     console.log('MongoDB Connected');
     await seedAdmin();
     await seedSupplier();
+    await seedDelivery();
   })
   .catch(err => console.error('MongoDB Connection Error:', err));
 
@@ -71,8 +73,32 @@ async function seedSupplier() {
         }
     } catch (err) {
         console.error('Supplier Seeding Error:', err);
+        }
+}
+
+// Seed Delivery Function
+async function seedDelivery() {
+    try {
+        const deliveryEmail = 'delivery@gmail.com';
+        const existingDelivery = await User.findOne({ email: deliveryEmail });
+        
+        if (!existingDelivery) {
+            console.log('Seeding Delivery User...');
+            const hashedPassword = await bcrypt.hash('delivery', 10);
+            const deliveryUser = new User({
+                username: 'ExpressDelivery',
+                email: deliveryEmail,
+                password: hashedPassword,
+                role: 'delivery'
+            });
+            await deliveryUser.save();
+            console.log('Delivery Account Created: delivery@gmail.com / delivery');
+        }
+    } catch (err) {
+        console.error('Delivery Seeding Error:', err);
     }
 }
+
 
 // Basic Route
 app.get('/', (req, res) => {
@@ -264,6 +290,17 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
+
+// Get All Orders (Admin/Inventory)
+app.get('/api/orders', async (req, res) => {
+    try {
+        const orders = await Order.find().sort({ createdAt: -1 });
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Get Orders by User ID
 app.get('/api/orders/user/:userId', async (req, res) => {
     try {
@@ -425,6 +462,114 @@ app.delete('/api/suppliers/:id', async (req, res) => {
     try {
         await Supplier.findByIdAndDelete(req.params.id);
         res.json({ msg: 'Supplier deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Feedback Routes ---
+
+// Submit Feedback & Update Product Rating
+app.post('/api/feedback', async (req, res) => {
+    try {
+        const { user, product, rating, comment } = req.body;
+        
+        // 1. Create Feedback Record
+        const feedback = new Feedback({ user, product, rating, comment });
+        await feedback.save();
+
+        // 2. Update Product Reviews & Average Rating
+        const productDoc = await Product.findById(product);
+        if (productDoc) {
+            const userDoc = await User.findById(user);
+            const newReview = {
+                user: user,
+                name: userDoc ? userDoc.username : 'Anonymous',
+                rating: Number(rating),
+                comment: comment
+            };
+
+            productDoc.reviews.push(newReview);
+
+            // Recalculate Average
+            const totalRating = productDoc.reviews.reduce((acc, item) => acc + item.rating, 0);
+            productDoc.ratings.average = totalRating / productDoc.reviews.length;
+            productDoc.ratings.count = productDoc.reviews.length;
+
+            await productDoc.save();
+        }
+
+        res.status(201).json(feedback);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get Feedback for Product
+app.get('/api/feedback/product/:id', async (req, res) => {
+    try {
+        const feedbackList = await Feedback.find({ product: req.params.id }).populate('user', 'username');
+        res.json(feedbackList);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Delivery Routes ---
+
+// Get Delivery Staff
+app.get('/api/users/delivery-staff', async (req, res) => {
+    try {
+        const staff = await User.find({ role: 'delivery' }).select('-password');
+        res.json(staff);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Assign Delivery Staff
+app.put('/api/orders/:id/assign', async (req, res) => {
+    try {
+        const { staffId } = req.body;
+        const order = await Order.findByIdAndUpdate(
+            req.params.id, 
+            { 
+                deliveryStaff: staffId, 
+                deliveryStatus: 'Assigned',
+                $push: { deliveryUpdates: { status: 'Assigned', note: 'Order assigned to delivery staff.' } }
+            }, 
+            { new: true }
+        );
+        res.json(order);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update Delivery Status
+app.put('/api/orders/:id/delivery-status', async (req, res) => {
+    try {
+        const { status, note } = req.body;
+        const order = await Order.findByIdAndUpdate(
+            req.params.id, 
+            { 
+                deliveryStatus: status,
+                status: status === 'Delivered' ? 'Delivered' : undefined, // Update main status only if Delivered
+                $push: { deliveryUpdates: { status, note } }
+            }, 
+            { new: true }
+        );
+        res.json(order);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get Assigned Orders for Delivery Staff
+app.get('/api/orders/delivery/:staffId', async (req, res) => {
+    try {
+        const orders = await Order.find({ deliveryStaff: req.params.staffId }).sort({ createdAt: -1 });
+        res.json(orders);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

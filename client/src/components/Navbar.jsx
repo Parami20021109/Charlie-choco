@@ -11,10 +11,12 @@ export default function Navbar() {
   return (
     <nav className={`fixed w-full z-50 p-6 flex justify-between items-center transition-all duration-300 ${isHome ? 'bg-black/10 backdrop-blur-sm' : 'bg-chocolate-900 border-b border-white/10'}`}>
         <Link to="/" className="text-2xl font-bold text-gold-500 font-serif tracking-wider">CHARLIE'S</Link>
-        <div className="space-x-8 text-sm font-medium tracking-widest hidden md:block">
+        <div className="space-x-8 text-xs font-bold font-sans tracking-[0.2em] hidden md:flex items-center">
           <Link to="/" className="hover:text-gold-500 transition-colors text-white">HOME</Link>
           <Link to="/products" className="hover:text-gold-500 transition-colors text-white">COLLECTION</Link>
-          <Link to="#" className="hover:text-gold-500 transition-colors text-white">STORY</Link>
+          <Link to="/about" className="hover:text-gold-500 transition-colors text-white">STORY</Link>
+          <Link to="/locations" className="hover:text-gold-500 transition-colors text-white">LOCATIONS</Link>
+          <Link to="/contact" className="hover:text-gold-500 transition-colors text-white">CONCIERGE</Link>
         </div>
         <div className="flex gap-6 items-center">
             {/* Cart Icon */}

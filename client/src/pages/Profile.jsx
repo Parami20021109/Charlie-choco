@@ -90,24 +90,61 @@ export default function Profile() {
                             >
                                 <div className="flex justify-between items-start mb-4 border-b border-white/5 pb-4">
                                     <div>
-                                        <p className="text-xs text-white/50 uppercase tracking-wider mb-1">Order #{order._id.slice(-6)}</p>
-                                        <p className="text-sm font-bold text-white">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <p className="text-xs text-white/50 uppercase tracking-wider">Order #{order._id.slice(-6)}</p>
+                                            {order.trackingId && <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 rounded">#{order.trackingId}</span>}
+                                        </div>
+                                        <p className="text-sm font-bold text-white mb-1">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${
+                                            order.deliveryStatus === 'Delivered' ? 'bg-green-500/20 text-green-400' :
+                                            order.deliveryStatus === 'Out for Delivery' ? 'bg-blue-500/20 text-blue-400' :
+                                            'bg-amber-500/20 text-amber-400'
+                                        }`}>
+                                            {order.deliveryStatus || 'Processing'}
+                                        </span>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xl font-mono text-gold-500 font-bold">${order.totalAmount.toFixed(2)}</p>
-                                        <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded font-bold uppercase">
+                                        <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded font-bold uppercase block mt-1">
                                             {order.status}
                                         </span>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     {order.items.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between text-sm">
-                                            <span className="text-chocolate-200">
-                                                <span className="text-white font-bold mr-2">{item.quantity}x</span> 
-                                                {item.name}
-                                            </span>
-                                            <span className="text-white/30">${item.price}</span>
+                                        <div key={idx} className="flex justify-between items-center text-sm bg-black/20 p-2 rounded">
+                                            <div className="flex flex-col">
+                                                <span className="text-chocolate-200">
+                                                    <span className="text-white font-bold mr-2">{item.quantity}x</span> 
+                                                    {item.name}
+                                                </span>
+                                                <span className="text-white/30 text-xs">${item.price}</span>
+                                            </div>
+                                            
+                                            {order.deliveryStatus === 'Delivered' && (
+                                                <button 
+                                                    onClick={async () => {
+                                                        const rating = prompt('Rate 1-5:', '5');
+                                                        if(!rating) return;
+                                                        const comment = prompt('Start writing your review...');
+                                                        
+                                                        await fetch('http://localhost:5000/api/feedback', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ 
+                                                                user: user.id, // Assuming user object has id
+                                                                product: item.product, 
+                                                                rating: parseInt(rating), 
+                                                                comment 
+                                                            })
+                                                        });
+                                                        alert('Review Submitted! Thank you.');
+                                                    }}
+                                                    className="text-xs bg-gold-600 hover:bg-gold-500 text-black px-3 py-1 rounded font-bold transition-colors"
+                                                >
+                                                    Rate & Review
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
