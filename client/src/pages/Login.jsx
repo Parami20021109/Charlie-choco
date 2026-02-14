@@ -27,6 +27,8 @@ const Login = () => {
             navigate('/chef');
         } else if (data.user.role === 'supplier' || data.user.email === 'supplier@gmail.com') {
             navigate('/suppliers');
+        } else if (data.user.role === 'delivery' || data.user.email === 'delivery@gmail.com') {
+            navigate('/delivery');
         } else {
             navigate('/profile');
         }

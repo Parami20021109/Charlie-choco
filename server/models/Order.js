@@ -15,6 +15,16 @@ const OrderSchema = new mongoose.Schema({
   ],
   totalAmount: { type: Number, required: true },
   status: { type: String, default: 'Pending' }, // Pending, Paid, Shipped
+  deliveryStaff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  trackingId: { type: String },
+  deliveryStatus: { type: String, default: 'Pending' }, // Pending, Assigned, Out for Delivery, Delivered
+  deliveryUpdates: [
+    {
+      status: String,
+      timestamp: { type: Date, default: Date.now },
+      note: String
+    }
+  ],
   createdAt: { type: Date, default: Date.now }
 });
 

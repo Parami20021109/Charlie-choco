@@ -65,6 +65,19 @@ export default function Products() {
                                 <span className="text-gold-500 font-mono text-lg">${product.price}</span>
                             </div>
                             <p className="text-chocolate-200 text-sm mb-4 line-clamp-2">{product.description}</p>
+                            
+                            {/* Star Rating Display */}
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="flex text-gold-500 text-sm">
+                                    {[...Array(5)].map((_, i) => (
+                                        <span key={i} className={i < Math.round(product.ratings?.average || 0) ? 'opacity-100' : 'opacity-20'}>★</span>
+                                    ))}
+                                </div>
+                                <span className="text-xs text-white/40 font-mono">
+                                    ({product.ratings?.count || 0} reviews)
+                                </span>
+                            </div>
+
                             <div className={`text-xs uppercase tracking-wider font-bold ${product.stock > 0 ? 'text-green-500' : 'text-red-500'}`}>
                                 {product.stock > 0 ? 'In Stock' : 'Sold Out'}
                             </div>

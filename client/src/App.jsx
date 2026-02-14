@@ -11,6 +11,11 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import ChefDashboard from './pages/ChefDashboard';
 import SupplierDashboard from './pages/SupplierDashboard';
+import DeliveryDashboard from './pages/DeliveryDashboard';
+import ReviewsManager from './pages/ReviewsManager';
+import About from './pages/About';
+import Locations from './pages/Locations';
+import Contact from './pages/Contact';
 import { CartProvider } from './context/CartContext';
 
 function App() {
@@ -19,6 +24,9 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/locations" element={<Locations />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/products" element={<Products />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
@@ -29,6 +37,8 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/chef" element={<ChefDashboard />} />
           <Route path="/suppliers" element={<SupplierDashboard />} />
+          <Route path="/delivery" element={<DeliveryDashboard />} />
+          <Route path="/reviews" element={<ReviewsManager />} />
         </Routes>
       </Router>
     </CartProvider>

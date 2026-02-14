@@ -6,6 +6,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [recentOrders, setRecentOrders] = useState([]);
+  const [deliveryStaff, setDeliveryStaff] = useState([]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -22,9 +23,11 @@ export default function AdminDashboard() {
       try {
         const resUsers = await fetch('http://localhost:5000/api/users');
         const resOrders = await fetch('http://localhost:5000/api/orders');
+        const resStaff = await fetch('http://localhost:5000/api/users/delivery-staff');
         
         if(resUsers.ok) setUsers(await resUsers.json());
-        if(resOrders.ok) setRecentOrders((await resOrders.json()).slice(0, 5)); // Top 5
+        if(resOrders.ok) setRecentOrders(await resOrders.json()); // Get all orders
+        if(resStaff.ok) setDeliveryStaff(await resStaff.json());
       } catch (err) {
           console.error(err);
       }
@@ -33,6 +36,16 @@ export default function AdminDashboard() {
   const deleteUser = async (id) => {
       if(!confirm('Ban this user from the factory?')) return;
       await fetch(`http://localhost:5000/api/users/${id}`, { method: 'DELETE' });
+      fetchData();
+  };
+
+  const assignDelivery = async (orderId, staffId) => {
+      if(!staffId) return;
+      await fetch(`http://localhost:5000/api/orders/${orderId}/assign`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffId })
+      });
       fetchData();
   };
 
@@ -56,7 +69,7 @@ export default function AdminDashboard() {
         <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
             
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -101,11 +114,28 @@ export default function AdminDashboard() {
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="p-8 bg-black/40 border border-white/10 rounded-2xl flex flex-col justify-center"
+                    transition={{ delay: 0.25 }}
+                    className="p-8 bg-gradient-to-br from-amber-900 to-orange-950 border border-white/10 rounded-2xl shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-transform cursor-pointer"
+                    onClick={() => navigate('/delivery')}
                 >
-                    <h2 className="text-xl font-serif text-gold-500 mb-4">Status</h2>
-                    <div className="space-y-4">
+                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity text-white">
+                        <span className="text-8xl">🚚</span>
+                    </div>
+                    <h2 className="text-2xl font-serif font-bold text-white mb-2">Delivery</h2>
+                    <p className="text-white/60 font-medium mb-6 text-sm">Track shipments.</p>
+                </motion.div>
+
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="p-8 bg-black/40 border border-white/10 rounded-2xl flex flex-col justify-center cursor-pointer hover:bg-white/5 transition-colors"
+                    onClick={() => navigate('/reviews')}
+                >
+                    <h2 className="text-xl font-serif text-gold-500 mb-2">⭐ Reviews</h2>
+                    <p className="text-white/60 text-xs mb-4">Read customer feedback.</p>
+                    
+                    <div className="space-y-2 pointer-events-none">
                         <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                              <span className="text-white/60">Users</span>
                              <span className="font-mono font-bold text-xl">{users.length}</span>
@@ -131,20 +161,44 @@ export default function AdminDashboard() {
                     <h3 className="text-gold-500 font-bold uppercase tracking-widest mb-6 flex items-center gap-2">
                         <span>📦</span> New Orders
                     </h3>
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                          {recentOrders.length === 0 ? (
                              <p className="text-white/30 text-center py-8">No orders yet.</p>
                          ) : (
                              recentOrders.map(order => (
-                                 <div key={order._id} className="bg-white/5 p-4 rounded-lg flex justify-between items-center">
-                                     <div>
-                                         <p className="font-bold text-sm">{order.customerName}</p>
-                                         <p className="text-xs text-white/50">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                 <div key={order._id} className="bg-white/5 p-4 rounded-lg flex flex-col gap-3">
+                                     <div className="flex justify-between items-start">
+                                         <div>
+                                             <p className="font-bold text-sm">{order.customerName}</p>
+                                             <p className="text-xs text-white/50">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                             <p className="text-xs text-white/40 mt-1">{order._id}</p>
+                                         </div>
+                                         <div className="text-right">
+                                             <p className="text-gold-400 font-mono font-bold">${order.totalAmount.toFixed(2)}</p>
+                                             <span className={`text-[10px] uppercase px-2 py-1 rounded ${
+                                                 order.deliveryStatus === 'Delivered' ? 'bg-green-500/20 text-green-400' : 
+                                                 order.deliveryStatus === 'Assigned' ? 'bg-blue-500/20 text-blue-400' :
+                                                 'bg-amber-500/20 text-amber-400'
+                                             }`}>{order.deliveryStatus || order.status}</span>
+                                         </div>
                                      </div>
-                                     <div className="text-right">
-                                         <p className="text-gold-400 font-mono font-bold">${order.totalAmount.toFixed(2)}</p>
-                                         <span className="text-[10px] uppercase bg-green-500/20 text-green-400 px-2 py-1 rounded">{order.status}</span>
-                                     </div>
+                                     
+                                     {/* Assignment Section */}
+                                     {order.deliveryStatus !== 'Delivered' && (
+                                         <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2">
+                                             <span className="text-xs text-white/40">Assign:</span>
+                                             <select 
+                                                 className="bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white"
+                                                 onChange={(e) => assignDelivery(order._id, e.target.value)}
+                                                 value={order.deliveryStaff || ""}
+                                             >
+                                                 <option value="">Select Staff</option>
+                                                 {deliveryStaff.map(s => (
+                                                     <option key={s._id} value={s._id}>{s.username}</option>
+                                                 ))}
+                                             </select>
+                                         </div>
+                                     )}
                                  </div>
                              ))
                          )}
