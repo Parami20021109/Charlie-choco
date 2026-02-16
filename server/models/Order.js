@@ -7,13 +7,17 @@ const OrderSchema = new mongoose.Schema({
   address: { type: String, required: true },
   items: [
     {
-      product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+      product: { type: mongoose.Schema.Types.Mixed }, // Can be ObjectId or String
       name: { type: String },
       quantity: { type: Number, required: true },
-      price: { type: Number, required: true }
+      price: { type: Number, required: true },
+      isCustom: { type: Boolean, default: false }
     }
   ],
   totalAmount: { type: Number, required: true },
+  pointsEarned: { type: Number, default: 0 },
+  pointsRedeemed: { type: Number, default: 0 },
+  goldenTicket: { type: Boolean, default: false },
   status: { type: String, default: 'Pending' }, // Pending, Paid, Shipped
   deliveryStaff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   trackingId: { type: String },

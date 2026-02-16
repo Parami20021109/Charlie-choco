@@ -14,6 +14,10 @@ const Order = require('./models/Order');
 const Recipe = require('./models/Recipe');
 const Supplier = require('./models/Supplier');
 const Feedback = require('./models/Feedback');
+const Message = require('./models/Message');
+const Batch = require('./models/Batch');
+const PurchaseOrder = require('./models/PurchaseOrder');
+const CustomBar = require('./models/CustomBar');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -192,6 +196,25 @@ app.put('/api/ingredients/:id', async (req, res) => {
     }
 });
 
+// Use (Reduce) Ingredient Stock
+app.post('/api/ingredients/:id/use', async (req, res) => {
+    try {
+        const { quantity } = req.body;
+        const ingredient = await Ingredient.findById(req.params.id);
+        if (!ingredient) return res.status(404).json({ msg: 'Ingredient not found' });
+        
+        if (ingredient.quantity < quantity) {
+            return res.status(400).json({ msg: `Insufficient ${ingredient.name}. Only ${ingredient.quantity} ${ingredient.unit} left.` });
+        }
+
+        ingredient.quantity -= Number(quantity);
+        await ingredient.save();
+        res.json(ingredient);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Delete Ingredient
 app.delete('/api/ingredients/:id', async (req, res) => {
     try {
@@ -255,6 +278,42 @@ app.post('/api/orders', async (req, res) => {
         
         if (!items || items.length === 0) return res.status(400).json({ msg: 'No items in order' });
 
+        // --- Loyalty Logic ---
+        let finalTotal = totalAmount;
+        let earnedPoints = 0;
+        let redeemedPoints = req.body.redeemedPoints || 0;
+
+        if (userId) {
+            const user = await User.findById(userId);
+            if (user) {
+                // Redemption (1 point = $1 discount)
+                if (redeemedPoints > 0) {
+                    if (user.points < redeemedPoints) return res.status(400).json({ msg: 'Insufficient points' });
+                    finalTotal = Math.max(0, totalAmount - redeemedPoints);
+                    user.points -= redeemedPoints;
+                }
+
+                // Earning (1 point per $10 spent)
+                earnedPoints = Math.floor(finalTotal / 10);
+                user.points += earnedPoints;
+
+                // --- Golden Ticket Random Chance ---
+                let wonGoldenTicket = false;
+                if (Math.random() < 0.05) { // 5% Chance
+                    user.points += 1000;
+                    wonGoldenTicket = true;
+                }
+
+                // Tier Upgrade Check
+                if (user.points > 1000) user.tier = 'Platinum';
+                else if (user.points > 500) user.tier = 'Gold';
+                else if (user.points > 200) user.tier = 'Silver';
+
+                await user.save();
+                req.wonGoldenTicket = wonGoldenTicket; // Pass to response
+            }
+        }
+
         const newOrder = new Order({
             user: userId || null,
             customerName,
@@ -262,30 +321,44 @@ app.post('/api/orders', async (req, res) => {
             address,
             location: req.body.location, // Capture coordinates
             items,
-            totalAmount,
+            totalAmount: finalTotal, // Updated total after discount
+            pointsEarned: earnedPoints,
+            pointsRedeemed: redeemedPoints,
+            goldenTicket: req.wonGoldenTicket || false,
             status: 'Paid'
         });
 
         await newOrder.save();
         
+        // Pass the ticket info in response
+        const orderData = newOrder.toObject();
+        orderData.wonGoldenTicket = req.wonGoldenTicket || false;
+        
         // --- INVENTORY DEDUCTION ---
         for (const item of items) {
-            // 1. Decrease Finished Product Stock
-            await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } });
+            if (item.isCustom) continue; // Skip custom bars from inventory stock
 
-            // 2. Decrease Raw Ingredients (Based on Recipe)
-            // Find if there's a recipe linked to this product
-            const recipe = await Recipe.findOne({ productLink: item.product });
-            if (recipe) {
-                for (const ingItem of recipe.ingredients) {
-                    await Ingredient.findByIdAndUpdate(ingItem.ingredient, { 
-                        $inc: { quantity: -(ingItem.quantity * item.quantity) } 
-                    });
+            try {
+                // 1. Decrease Finished Product Stock
+                await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } });
+
+                // 2. Decrease Raw Ingredients (Based on Recipe)
+                const recipe = await Recipe.findOne({ productLink: item.product });
+                if (recipe) {
+                    for (const ingItem of recipe.ingredients) {
+                        await Ingredient.findByIdAndUpdate(ingItem.ingredient, { 
+                            $inc: { quantity: -(ingItem.quantity * item.quantity) } 
+                        });
+                    }
                 }
+            } catch (invErr) {
+                console.warn(`Inventory deduction failed for item ${item.name}:`, invErr.message);
+                // We don't fail the whole order if inventory deduction fails for one item
+                // to avoid blocking sales, but in a real app you'd want transactions.
             }
         }
 
-        res.status(201).json(newOrder);
+        res.status(201).json(orderData || newOrder);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -420,6 +493,17 @@ app.delete('/api/users/:id', async (req, res) => {
     try {
         await User.findByIdAndDelete(req.params.id);
         res.json({ msg: 'User deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get User Points
+app.get('/api/users/:id/points', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('points tier');
+        if(!user) return res.status(404).json({ msg: 'User not found' });
+        res.json(user);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -576,6 +660,250 @@ app.get('/api/orders/delivery/:staffId', async (req, res) => {
     }
 });
 
+// --- Message / Contact Routes ---
+
+// Submit Contact Message
+app.post('/api/messages', async (req, res) => {
+    try {
+        const newMessage = new Message(req.body);
+        await newMessage.save();
+        res.status(201).json(newMessage);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get Messages (Admin)
+app.get('/api/messages', async (req, res) => {
+    try {
+        const messages = await Message.find().sort({ createdAt: -1 });
+        res.json(messages);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Production Batch Routes (Factory Management) ---
+
+// Get All Batches
+app.get('/api/batches', async (req, res) => {
+    try {
+        const batches = await Batch.find().populate('recipe').populate('qualityCheck.inspector').sort({ createdAt: -1 });
+        res.json(batches);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Create New Batch (Start Production)
+app.post('/api/batches', async (req, res) => {
+    try {
+        const { recipeId, quantity } = req.body;
+        const recipe = await Recipe.findById(recipeId);
+        if(!recipe) return res.status(404).json({ msg: 'Recipe not found' });
+
+        // 1. Validate Ingredients Stock
+        for (const item of recipe.ingredients) {
+            const ingredient = await Ingredient.findById(item.ingredient);
+            const totalNeeded = item.quantity * quantity;
+            if (!ingredient || ingredient.quantity < totalNeeded) {
+                return res.status(400).json({ msg: `Not enough ${ingredient ? ingredient.name : 'ingredient'}` });
+            }
+        }
+
+        // 2. Deduct Ingredients Immediately
+        for (const item of recipe.ingredients) {
+            const totalNeeded = item.quantity * quantity;
+            await Ingredient.findByIdAndUpdate(item.ingredient, { $inc: { quantity: -totalNeeded } });
+        }
+
+        // 3. Create Batch Record
+        const newBatch = new Batch({
+            batchNumber: `BAT-${Date.now()}`, // Simple unique ID
+            recipe: recipeId,
+            quantity: quantity,
+            stages: [
+                { name: 'Roasting', status: 'Pending' },
+                { name: 'Refining', status: 'Pending' },
+                { name: 'Mixing', status: 'Pending' },
+                { name: 'Molding', status: 'Pending' },
+                { name: 'Cooling', status: 'Pending' }
+            ]
+        });
+
+        await newBatch.save();
+        res.status(201).json(newBatch);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update Batch Stage
+app.put('/api/batches/:id/stage', async (req, res) => {
+    try {
+        const { stageName, status, notes } = req.body;
+        const batch = await Batch.findById(req.params.id);
+        
+        const stageIndex = batch.stages.findIndex(s => s.name === stageName);
+        if (stageIndex === -1) return res.status(404).json({ msg: 'Stage not found' });
+
+        batch.stages[stageIndex].status = status;
+        if(status === 'In_Progress' && !batch.stages[stageIndex].startTime) {
+            batch.stages[stageIndex].startTime = new Date();
+        }
+        if(status === 'Completed') {
+            batch.stages[stageIndex].endTime = new Date();
+            batch.currentStage = stageName; // Track last active stage
+        }
+        if(notes) batch.stages[stageIndex].notes = notes;
+
+        // Auto-update main status if specific conditions met (optional logic could replace this)
+        batch.status = stageName; 
+
+        await batch.save();
+        res.json(batch);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Quality Check & Completions
+app.put('/api/batches/:id/qc', async (req, res) => {
+    try {
+        const { status, inspectorId, remarks } = req.body; // status: 'Approved' or 'Rejected'
+        const batch = await Batch.findById(req.params.id).populate('recipe');
+        
+        batch.qualityCheck = {
+            inspector: inspectorId,
+            status,
+            remarks,
+            date: new Date()
+        };
+        
+        batch.status = status === 'Approved' ? 'Completed' : 'Rejected';
+
+        // If Approved, Add to Finished Product Stock
+        if (status === 'Approved' && batch.recipe.productLink) {
+             await Product.findByIdAndUpdate(batch.recipe.productLink, { $inc: { stock: batch.quantity } });
+        }
+
+        await batch.save();
+        res.json(batch);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// --- Purchase Order / Procurement Routes ---
+
+// Get All POs
+app.get('/api/purchase-orders', async (req, res) => {
+    try {
+        const pos = await PurchaseOrder.find()
+            .populate('supplier')
+            .populate('items.ingredient')
+            .sort({ orderDate: -1 });
+        res.json(pos);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Create Purchase Order
+app.post('/api/purchase-orders', async (req, res) => {
+    try {
+        const { supplierId, items, notes } = req.body;
+        
+        // Calculate totals
+        let grandTotal = 0;
+        const processedItems = items.map(item => {
+            const lineTotal = item.quantity * item.unitPrice;
+            grandTotal += lineTotal;
+            return {
+                ingredient: item.ingredientId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                total: lineTotal
+            };
+        });
+
+        const newPO = new PurchaseOrder({
+            poNumber: `PO-${Date.now()}`,
+            supplier: supplierId,
+            items: processedItems,
+            totalAmount: grandTotal,
+            notes
+        });
+
+        await newPO.save();
+        res.status(201).json(newPO);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update PO Status (Receive items = Update Inventory)
+app.put('/api/purchase-orders/:id/status', async (req, res) => {
+    try {
+        const { status } = req.body; // 'Received', 'Ordered', 'Cancelled'
+        const po = await PurchaseOrder.findById(req.params.id);
+        
+        if (!po) return res.status(404).json({ msg: 'PO not found' });
+        
+        // If changing to Received, update inventory
+        if (status === 'Received' && po.status !== 'Received') {
+            for (const item of po.items) {
+                await Ingredient.findByIdAndUpdate(item.ingredient, { 
+                    $inc: { quantity: item.quantity } 
+                });
+            }
+            po.receivedDate = new Date();
+        }
+
+        po.status = status;
+        await po.save();
+        res.json(po);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// --- Custom Chocolate Bar (Inventing Room) ---
+
+// Save Custom Design
+app.post('/api/custom-bars', async (req, res) => {
+    try {
+        const newBar = new CustomBar(req.body);
+        await newBar.save();
+        res.status(201).json(newBar);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get User's Designs
+app.get('/api/custom-bars/user/:userId', async (req, res) => {
+    try {
+        const designs = await CustomBar.find({ user: req.params.userId }).sort({ createdAt: -1 });
+        res.json(designs);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get All Designs (Admin)
+app.get('/api/custom-bars', async (req, res) => {
+    try {
+        const designs = await CustomBar.find().populate('user', 'username email').sort({ createdAt: -1 });
+        res.json(designs);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });

@@ -11,17 +11,43 @@ export default function Checkout() {
     const [locationType, setLocationType] = useState('manual'); // 'manual' or 'gps'
     const [gpsLoading, setGpsLoading] = useState(false);
     const [gpsCoords, setGpsCoords] = useState(null);
+    const [wonGoldenTicket, setWonGoldenTicket] = useState(false);
     const [formData, setFormData] = useState({
         name: '', email: '', address: '', card: '', expiry: '', cvc: ''
     });
+    const [userPoints, setUserPoints] = useState(0);
+    const [redeemPoints, setRedeemPoints] = useState(false);
+    const [pointsDiscount, setPointsDiscount] = useState(0);
 
     // Auto-fill form if user is logged in
+    // Auto-fill form and fetch points if user is logged in
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem('user'));
         if(user) {
             setFormData(prev => ({...prev, name: user.username, email: user.email}));
+            fetchPoints(user.id);
         }
     }, []);
+
+    const fetchPoints = async (id) => {
+        try {
+            const res = await fetch(`http://localhost:5000/api/users/${id}/points`);
+            if(res.ok) {
+                const data = await res.json();
+                setUserPoints(data.points);
+            }
+        } catch(err) { console.error(err); }
+    };
+
+    useEffect(() => {
+        if(redeemPoints) {
+            // Cap discount at total amount or available points
+            const maxDiscount = Math.min(userPoints, total);
+            setPointsDiscount(maxDiscount);
+        } else {
+            setPointsDiscount(0);
+        }
+    }, [redeemPoints, total, userPoints]);
 
     const handleUseCurrentLocation = () => {
         if (!navigator.geolocation) {
@@ -83,9 +109,11 @@ export default function Checkout() {
                         product: item._id,
                         name: item.name,
                         quantity: item.quantity,
-                        price: item.price
+                        price: item.price,
+                        isCustom: item.isCustom || false
                     })),
-                    totalAmount: total
+                    totalAmount: total, 
+                    redeemedPoints: redeemPoints ? pointsDiscount : 0
                 };
 
                 const res = await fetch('http://localhost:5000/api/orders', {
@@ -95,6 +123,10 @@ export default function Checkout() {
                 });
 
                 if(res.ok) {
+                    const data = await res.json();
+                    if (data.wonGoldenTicket) {
+                        setWonGoldenTicket(true);
+                    }
                     setStep('success');
                     clearCart();
                 } else {
@@ -121,7 +153,23 @@ export default function Checkout() {
                         <svg className="w-10 h-10 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
                     </div>
                     <h2 className="text-3xl font-serif text-gold-500 mb-4">Payment Successful!</h2>
-                    <p className="text-white mb-8">Your Golden Ticket has been issued. The Oompa Loompas are packing your order now.</p>
+                    
+                    {wonGoldenTicket ? (
+                        <motion.div 
+                            initial={{ rotate: -5, scale: 0.9 }}
+                            animate={{ rotate: 0, scale: 1 }}
+                            className="bg-gold-500 text-black p-8 rounded-lg mb-8 relative overflow-hidden"
+                        >
+                             <div className="absolute inset-0 border-4 border-black/10 m-2"></div>
+                             <h3 className="text-2xl font-bold uppercase tracking-tighter mb-2 italic">GOLDEN TICKET</h3>
+                             <p className="text-sm font-bold opacity-80">You've won a special prize: 1,000 Points!</p>
+                             <div className="mt-4 text-[10px] uppercase tracking-widest font-black border-t border-black/20 pt-2">VALID AT ALL WONKA FACTORIES</div>
+                             <Sparkles count={50} scale={2} size={2} speed={1} />
+                        </motion.div>
+                    ) : (
+                        <p className="text-white mb-8">Your Golden Ticket has been issued. The Oompa Loompas are packing your order now.</p>
+                    )}
+
                     <button onClick={() => navigate('/products')} className="px-8 py-3 bg-white text-chocolate-900 font-bold rounded-full hover:bg-gold-500 transition-colors">Continue Shopping</button>
                 </motion.div>
             </div>
@@ -151,12 +199,40 @@ export default function Checkout() {
                             </div>
                         ))}
                      </div>
-                     <div className="mt-8 pt-8 border-t border-white/10">
-                        <div className="flex justify-between text-xl font-bold">
+                     <div className="mt-8 pt-8 border-t border-white/10 space-y-2">
+                        <div className="flex justify-between text-sm text-white/60">
+                            <span>Subtotal</span>
+                            <span>${total.toFixed(2)}</span>
+                        </div>
+                        {redeemPoints && (
+                            <div className="flex justify-between text-sm text-gold-500 font-bold">
+                                <span>Loyalty Discount ({pointsDiscount} pts)</span>
+                                <span>-${pointsDiscount.toFixed(2)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between text-xl font-bold pt-4 border-t border-white/10">
                             <span>Total Due</span>
-                            <span className="text-gold-500">${total.toFixed(2)}</span>
+                            <span className="text-gold-500">${Math.max(0, total - pointsDiscount).toFixed(2)}</span>
                         </div>
                      </div>
+
+                     {/* Loyalty Redemption Toggle */}
+                     {userPoints > 0 && (
+                         <div className="mt-6 bg-gold-500/10 border border-gold-500/30 p-4 rounded-xl flex justify-between items-center">
+                             <div>
+                                 <p className="text-xs text-gold-500 font-bold uppercase tracking-wider">Wonka Gold Points</p>
+                                 <p className="text-sm font-bold text-white">Available: {userPoints}</p>
+                             </div>
+                             <label className="flex items-center cursor-pointer">
+                                 <div className="relative">
+                                     <input type="checkbox" className="sr-only" checked={redeemPoints} onChange={()=>setRedeemPoints(!redeemPoints)} />
+                                     <div className={`block w-10 h-6 rounded-full transition-colors ${redeemPoints ? 'bg-gold-500' : 'bg-gray-600'}`}></div>
+                                     <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${redeemPoints ? 'transform translate-x-4' : ''}`}></div>
+                                 </div>
+                                 <span className="ml-3 text-xs font-bold text-white uppercase">Redeem</span>
+                             </label>
+                         </div>
+                     )}
                 </div>
 
                 {/* Secure Payment Side */}
@@ -225,7 +301,7 @@ export default function Checkout() {
                         </div>
 
                         <button disabled={loading} type="submit" className="w-full py-4 mt-6 bg-gold-500 hover:bg-white text-black font-bold uppercase tracking-widest rounded-lg transition-all transform active:scale-95 shadow-lg shadow-gold-500/20">
-                            Pay ${total.toFixed(2)}
+                            Pay ${Math.max(0, total - pointsDiscount).toFixed(2)}
                         </button>
                          <p className="text-[10px] text-center text-white/30 mt-4"><span className="text-green-500">🔒 256-Bit SSL Encrypted.</span> Powered by WonkaPay.</p>
                     </form>

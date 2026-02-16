@@ -16,6 +16,8 @@ import ReviewsManager from './pages/ReviewsManager';
 import About from './pages/About';
 import Locations from './pages/Locations';
 import Contact from './pages/Contact';
+import InventingRoom from './pages/InventingRoom';
+import FactoryMap from './pages/FactoryMap';
 import { CartProvider } from './context/CartContext';
 
 function App() {
@@ -39,6 +41,8 @@ function App() {
           <Route path="/suppliers" element={<SupplierDashboard />} />
           <Route path="/delivery" element={<DeliveryDashboard />} />
           <Route path="/reviews" element={<ReviewsManager />} />
+          <Route path="/inventing-room" element={<InventingRoom />} />
+          <Route path="/factory-map" element={<FactoryMap />} />
         </Routes>
       </Router>
     </CartProvider>

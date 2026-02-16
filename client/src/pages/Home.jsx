@@ -166,6 +166,45 @@ function Home() {
         </div>
       </section>
 
+      {/* --- INVENTING ROOM CTA --- */}
+      <section className="py-24 bg-gradient-to-r from-chocolate-900 to-black relative overflow-hidden group">
+          <div className="absolute inset-0 opacity-20 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/honeycomb.png')]"></div>
+          <div className="max-w-7xl mx-auto px-6 relative z-10 flex flex-col md:flex-row items-center gap-12">
+              <div className="flex-1">
+                  <span className="text-gold-500 uppercase tracking-widest text-xs font-bold mb-4 block">Exclusive Feature</span>
+                  <h2 className="text-5xl md:text-6xl font-serif text-white mb-6">The Inventing Room</h2>
+                  <p className="text-chocolate-100 text-lg mb-8 max-w-xl">
+                      Have you ever dreamed of creating your own chocolate bar? Choose your base, 
+                      sprinkle in the magic, and design the wrapper of your dreams. 
+                      Your creation, delivered from our factory to your door.
+                  </p>
+                  <Link to="/inventing-room">
+                      <motion.button 
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-10 py-5 bg-gold-500 text-black font-bold uppercase tracking-[0.2em] rounded shadow-2xl shadow-gold-500/20 hover:bg-white transition-all"
+                      >
+                          Start Inventing 🎩
+                      </motion.button>
+                  </Link>
+              </div>
+              <div className="flex-1 relative">
+                  <motion.div 
+                      animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
+                      transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+                      className="relative z-20"
+                  >
+                      <img 
+                          src="https://images.unsplash.com/photo-1623855244183-52fd8d3ce2f7?q=80&w=1000&auto=format&fit=crop" 
+                          alt="Custom Chocolate" 
+                          className="rounded-3xl shadow-2xl border border-white/10"
+                      />
+                  </motion.div>
+                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-gold-500/20 blur-3xl rounded-full animate-pulse"></div>
+              </div>
+          </div>
+      </section>
+
       {/* --- IMMERSIVE BANNER --- */}
       <section className="h-[80vh] relative overflow-hidden flex items-center justify-center">
          <div className="absolute inset-0">

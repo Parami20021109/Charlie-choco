@@ -14,6 +14,7 @@ export default function Navbar() {
         <div className="space-x-8 text-xs font-bold font-sans tracking-[0.2em] hidden md:flex items-center">
           <Link to="/" className="hover:text-gold-500 transition-colors text-white">HOME</Link>
           <Link to="/products" className="hover:text-gold-500 transition-colors text-white">COLLECTION</Link>
+          <Link to="/factory-map" className="hover:text-gold-500 transition-colors text-white">LIVE MAP</Link>
           <Link to="/about" className="hover:text-gold-500 transition-colors text-white">STORY</Link>
           <Link to="/locations" className="hover:text-gold-500 transition-colors text-white">LOCATIONS</Link>
           <Link to="/contact" className="hover:text-gold-500 transition-colors text-white">CONCIERGE</Link>

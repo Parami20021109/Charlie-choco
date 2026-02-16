@@ -6,10 +6,25 @@ export default function Contact() {
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const handleSubmit = (e) => {
+      const handleSubmit = async (e) => {
       e.preventDefault();
-      // Simulate submission
-      setTimeout(() => setIsSubmitted(true), 1000);
+      try {
+        const response = await fetch('http://localhost:5000/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formState)
+        });
+
+        if (response.ok) {
+            setIsSubmitted(true);
+            setFormState({ name: '', email: '', message: '' });
+        } else {
+            alert('Failed to send message. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        alert('An error occurred. Please try again later.');
+      }
   };
 
   return (
